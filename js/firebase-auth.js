@@ -42,7 +42,7 @@ export async function createFirebaseUser(name, email, password) {
     }
     await authModule.signOut(auth);
     return {
-      id: credential.user.email,
+      id: credential.user.uid,
       name: name.trim() || credential.user.email,
       email: credential.user.email,
     };
@@ -56,7 +56,7 @@ export async function loginFirebaseUser(email, password) {
     const { auth, authModule } = await getFirebaseAuth();
     const credential = await authModule.signInWithEmailAndPassword(auth, email, password);
     return {
-      id: credential.user.email,
+      id: credential.user.uid,
       name: credential.user.displayName || credential.user.email,
       email: credential.user.email,
     };

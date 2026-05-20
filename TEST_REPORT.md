@@ -25,6 +25,8 @@ Used a separate local QA user: `qa-test`
 - Updated email signup/login flow: Passed
 - Secure reset-password link flow: Passed
 - Security hardening pass: Passed with remaining production notes below
+- Cloud data storage wiring: Passed code checks; requires Firestore to be enabled in Firebase Console
+- Penetration-style security review: Passed with launch checklist items
 
 ## Fixes Made During QA
 
@@ -44,13 +46,21 @@ Used a separate local QA user: `qa-test`
 - Password reset avoids revealing whether an email address exists.
 - User-entered and imported text is escaped before display.
 - Local server and Netlify config now include basic security headers.
+- Finance data now saves to Cloud Firestore when Firebase is enabled.
+- Cloud data path is `users/{uid}/finance/main`.
+- Firestore rules were added so users can only read and write their own `users/{uid}` data.
+- Firestore writes are now limited to expected top-level fields.
+- Local cached finance data is removed on logout.
+- Local password fallback was removed so login fails closed if Firebase is not connected.
+- Backup import file size is limited.
 
 ## Remaining Production Security Notes
 
-- Finance data is still stored in browser localStorage. For real multi-user hosting, move accounts, expenses, bills, debts and payroll data to Firestore or another backend.
-- Add Firestore security rules so each logged-in user can only read and write their own records.
+- A local browser copy is still kept as a fallback cache, but Firestore is now the main cloud store when enabled.
 - Firebase web config is safe to be public, but Firestore rules and authorized domains must be configured before launch.
 - Use HTTPS on the hosted domain.
+- Enable Firebase App Check before public launch.
+- Set Firebase/Google Cloud billing budget alerts before public launch.
 
 ## Verified Scenario
 

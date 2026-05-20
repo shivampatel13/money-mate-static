@@ -4,11 +4,12 @@ import { getSession, loadData, login, logout, makeId, register, requestPasswordR
 
 const app = document.querySelector("#app");
 let session = getSession();
-let state = session ? loadData(session.id) : null;
+let state = null;
 let route = location.hash.replace("#/", "") || "dashboard";
 let message = "";
 let authMode = "login";
 let authMessage = "";
+let loadingText = session ? "Loading your saved money data..." : "";
 
 const nav = [
   ["dashboard", "Dashboard", "D"],
@@ -19,7 +20,15 @@ const nav = [
   ["more", "More", "M"],
 ];
 
-const persist = () => session && saveData(session.id, state);
+const MAX_IMPORT_BYTES = 500_000;
+const persist = async () => {
+  if (!session) return;
+  try {
+    await saveData(session.id, state);
+  } catch (error) {
+    alert(error.message || "We could not save your data. Check your connection and try again.");
+  }
+};
 const setRoute = (next) => {
   route = next;
   location.hash = `/${next}`;
@@ -327,6 +336,10 @@ function helpPage() {
 }
 
 function render() {
+  if (loadingText) {
+    app.innerHTML = loadingPage(loadingText);
+    return;
+  }
   if (!session) {
     app.innerHTML = authPage();
     bindAuth();
@@ -359,11 +372,20 @@ function bindAuth() {
       } else {
         const password = document.querySelector("#auth-password").value;
         session = await login(email, password);
-        state = loadData(session.id);
+        loadingText = "Loading your saved money data...";
+        render();
+        state = await loadData(session.id);
+        loadingText = "";
         authMessage = "";
         render();
       }
     } catch (error) {
+      loadingText = "";
+      if (session && !state) {
+        await logout();
+        session = null;
+      }
+      render();
       document.querySelector("#auth-error").textContent = error.message;
     }
   });
@@ -378,7 +400,7 @@ function bindAuth() {
 
 function bindApp() {
   document.querySelectorAll("[data-route]").forEach((button) => button.addEventListener("click", () => setRoute(button.dataset.route)));
-  document.querySelectorAll("[data-action='logout']").forEach((button) => button.addEventListener("click", () => { logout(); session = null; state = null; render(); }));
+  document.querySelectorAll("[data-action='logout']").forEach((button) => button.addEventListener("click", async () => { await logout(); session = null; state = null; render(); }));
   document.querySelector("[data-save-pay]")?.addEventListener("click", savePay);
   document.querySelector("[data-add-account]")?.addEventListener("click", addAccount);
   document.querySelector("[data-add-expense]")?.addEventListener("click", addExpense);
@@ -397,23 +419,23 @@ function bindApp() {
   });
 }
 
-function savePay() {
+async function savePay() {
   ["hourlyRate", "hoursPerWeek", "overtimeHours", "overtimeRate", "pensionPercentage"].forEach((key) => (state.payroll[key] = Number(document.querySelector(`#${key}`).value || 0)));
   state.payroll.region = document.querySelector("#region").value;
   state.payroll.studentLoanPlan = document.querySelector("#studentLoanPlan").value;
-  persist();
+  await persist();
   flash("Pay details saved.");
 }
 
-function addAccount() {
+async function addAccount() {
   const name = value("account-name");
   if (!name) return alert("Enter an account name.");
   state.accounts.push({ id: makeId(), name, type: value("account-type"), balance: number("account-balance"), createdAt: new Date().toISOString() });
-  persist();
+  await persist();
   flash("Account added.");
 }
 
-function addExpense() {
+async function addExpense() {
   const name = value("expense-name");
   const amount = number("expense-amount");
   const accountId = value("expense-account");
@@ -423,43 +445,43 @@ function addExpense() {
   const expense = { id: makeId(), name, amount, category: value("expense-category"), accountId, date: value("expense-date") || today(), paymentMethod: value("expense-method") || "Debit Card", createdAt: new Date().toISOString() };
   state.expenses.push(expense);
   state.accounts = state.accounts.map((account) => account.id === accountId ? { ...account, balance: account.type === "credit_card" ? account.balance + amount : account.balance - amount } : account);
-  persist();
+  await persist();
   flash("Spending saved.");
 }
 
-function addBudget() {
+async function addBudget() {
   const category = value("budget-category");
   const limit = number("budget-limit");
   if (limit <= 0) return alert("Enter a monthly budget above £0.");
   if (state.budgets.some((item) => item.category === category)) return alert("This category already has a budget.");
   state.budgets.push({ id: makeId(), category, limit, createdAt: new Date().toISOString() });
-  persist();
+  await persist();
   flash("Budget created.");
 }
 
-function addBill() {
+async function addBill() {
   const name = value("bill-name");
   const amount = number("bill-amount");
   if (!name || amount <= 0) return alert("Enter a bill name and amount.");
   state.subscriptions.push({ id: makeId(), name, amount, frequency: value("bill-frequency"), paymentDate: value("bill-date") || today(), status: "active", createdAt: new Date().toISOString() });
-  persist();
+  await persist();
   flash("Bill added.");
 }
 
-function addDebt() {
+async function addDebt() {
   const name = value("debt-name");
   const amount = number("debt-amount");
   if (!name || amount <= 0) return alert("Enter a debt name and amount.");
   state.debts.push({ id: makeId(), name, amount, minimumPayment: number("debt-minimum"), dueDate: value("debt-date") || today(), status: "unpaid", createdAt: new Date().toISOString() });
-  persist();
+  await persist();
   flash("Debt added.");
 }
 
-function deleteItem(type, id) {
+async function deleteItem(type, id) {
   if (!confirm("Delete this item? This cannot be undone.")) return;
   const map = { account: "accounts", expense: "expenses", budget: "budgets", bill: "subscriptions", debt: "debts" };
   state[map[type]] = state[map[type]].filter((item) => item.id !== id);
-  persist();
+  await persist();
   flash("Item deleted.");
 }
 
@@ -476,11 +498,16 @@ function exportData() {
 function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
+  if (file.size > MAX_IMPORT_BYTES) {
+    alert("Choose a smaller Money Mate backup file.");
+    event.target.value = "";
+    return;
+  }
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       state = { ...state, ...JSON.parse(reader.result) };
-      persist();
+      await persist();
       flash("Backup imported.");
     } catch {
       alert("Choose a valid Money Mate backup file.");
@@ -489,11 +516,24 @@ function importData(event) {
   reader.readAsText(file);
 }
 
-function resetData() {
+async function resetData() {
   if (!confirm("Reset all your data?")) return;
   state = { ...state, accounts: [], expenses: [], budgets: [], subscriptions: [], debts: [], payroll: { ...defaultPayroll }, categories: [...defaultCategories] };
-  persist();
+  await persist();
   flash("Data reset.");
+}
+
+function loadingPage(text) {
+  return `
+    <main class="auth-page">
+      <section class="auth-card center">
+        <div class="brand-mark">M</div>
+        <p class="eyebrow">Money Mate</p>
+        <h1>Please wait</h1>
+        <p class="muted">${escapeHtml(text)}</p>
+      </section>
+    </main>
+  `;
 }
 
 function authPage() {
@@ -600,4 +640,20 @@ function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[char]);
 }
 
-render();
+async function init() {
+  if (session) {
+    try {
+      state = await loadData(session.id);
+    } catch (error) {
+      authMessage = "For your security, please log in again.";
+      console.error(error);
+      localStorage.removeItem("mm_session");
+      session = null;
+      state = null;
+    }
+    loadingText = "";
+  }
+  render();
+}
+
+init();

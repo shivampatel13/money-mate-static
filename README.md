@@ -26,7 +26,7 @@ No build step is required.
 
 ## Notes
 
-Data is saved in browser `localStorage` per logged-in user. For production multi-device accounts, connect a backend such as Firebase, Supabase, or a custom Node.js API.
+When Firebase is enabled, finance data is saved to Cloud Firestore under the logged-in user's private document. A local browser copy is still kept as a fallback cache.
 
 ## Enable Secure Email Login And Password Reset Links
 
@@ -40,3 +40,22 @@ To use secure hosted login and send real reset links:
 4. Set `firebaseEnabled` to `true`.
 
 After that, login, account creation and Forgot Password will use Firebase Authentication. The app will send a verified email reset link instead of changing a password directly in the browser.
+
+## Enable Cloud Data Saving
+
+1. In Firebase Console, open your project.
+2. Go to Build > Firestore Database.
+3. Click Create database.
+4. Start in production mode.
+5. Choose a region close to your users.
+6. Open the Rules tab.
+7. Paste the rules from `firestore.rules`.
+8. Publish the rules.
+
+The app saves data at:
+
+```text
+users/{firebase-user-uid}/finance/main
+```
+
+The rule only allows a logged-in user to read and write their own `users/{uid}` records.

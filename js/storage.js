@@ -1,7 +1,7 @@
 import { categories, defaultPayroll, taxSettings } from "./defaults.js";
 import { createFirebaseUser, firebaseReady, loginFirebaseUser, sendVerifiedPasswordResetEmail, signOutFirebaseUser } from "./firebase-auth.js";
+import { loadCloudData, saveCloudData } from "./cloud-storage.js";
 
-const USERS_KEY = "mm_users";
 const SESSION_KEY = "mm_session";
 
 const starterData = () => ({
@@ -30,18 +30,8 @@ const readJson = (key, fallback) => {
 
 const writeJson = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 const clearLegacyAuthIfNeeded = () => {
-  if (firebaseReady()) {
-    localStorage.removeItem(USERS_KEY);
-  }
+  localStorage.removeItem("mm_users");
 };
-
-const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-
-async function hashPassword(password, salt) {
-  const data = new TextEncoder().encode(`${salt}:${password}`);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return bytesToHex(new Uint8Array(hash));
-}
 
 export function getSession() {
   clearLegacyAuthIfNeeded();
@@ -53,9 +43,13 @@ export function getSession() {
   return session;
 }
 
-export function logout() {
+export async function logout() {
+  const session = readJson(SESSION_KEY, null);
   if (firebaseReady()) {
-    signOutFirebaseUser();
+    await signOutFirebaseUser();
+  }
+  if (session?.id) {
+    localStorage.removeItem(userDataKey(session.id));
   }
   localStorage.removeItem(SESSION_KEY);
 }
@@ -66,51 +60,29 @@ export async function register(name, email, password) {
   if (!name.trim()) throw new Error("Enter your name.");
   if (!id || !id.includes("@")) throw new Error("Enter a valid email address.");
   if (password.length < 8) throw new Error("Use at least 8 characters for the password.");
-
-  if (firebaseReady()) {
-    const user = await createFirebaseUser(name, id, password);
-    if (!localStorage.getItem(userDataKey(user.id))) {
-      writeJson(userDataKey(user.id), starterData());
-    }
-    return user;
+  if (!firebaseReady()) {
+    throw new Error("Secure cloud login is not connected. Please connect Firebase before creating accounts.");
   }
 
-  const users = readJson(USERS_KEY, []);
-  if (users.some((user) => user.id === id)) throw new Error("That email already has an account. Please log in.");
-  const saltBytes = new Uint8Array(16);
-  crypto.getRandomValues(saltBytes);
-  const salt = bytesToHex(saltBytes);
-  const user = {
-    id,
-    name: name.trim(),
-    email: id,
-    salt,
-    passwordHash: await hashPassword(password, salt),
-    createdAt: new Date().toISOString(),
-  };
-  writeJson(USERS_KEY, [...users, user]);
-  writeJson(userDataKey(id), starterData());
-  return { id: user.id, name: user.name, email: user.email };
+  const user = await createFirebaseUser(name, id, password);
+  if (!localStorage.getItem(userDataKey(user.id))) {
+    writeJson(userDataKey(user.id), starterData());
+  }
+  return user;
 }
 
 export async function login(email, password) {
   clearLegacyAuthIfNeeded();
   const id = normaliseEmail(email);
-
-  if (firebaseReady()) {
-    const session = { ...(await loginFirebaseUser(id, password)), authProvider: "firebase", signedInAt: new Date().toISOString() };
-    if (!localStorage.getItem(userDataKey(session.id))) {
-      writeJson(userDataKey(session.id), starterData());
-    }
-    writeJson(SESSION_KEY, session);
-    return session;
+  if (!firebaseReady()) {
+    throw new Error("Secure cloud login is not connected. Please connect Firebase before logging in.");
   }
 
-  const user = readJson(USERS_KEY, []).find((item) => item.id === id);
-  if (!user) throw new Error("No account found for that email.");
-  const passwordHash = await hashPassword(password, user.salt);
-  if (passwordHash !== user.passwordHash) throw new Error("Password is incorrect.");
-  const session = { id: user.id, name: user.name, email: user.email || user.id };
+  const session = { ...(await loginFirebaseUser(id, password)), authProvider: "firebase", signedInAt: new Date().toISOString() };
+  const oldEmailData = readJson(userDataKey(id), null);
+  if (!localStorage.getItem(userDataKey(session.id))) {
+    writeJson(userDataKey(session.id), oldEmailData || starterData());
+  }
   writeJson(SESSION_KEY, session);
   return session;
 }
@@ -123,12 +95,19 @@ export async function requestPasswordReset(email) {
   return { email: id };
 }
 
-export function loadData(userId) {
-  return { ...starterData(), ...readJson(userDataKey(userId), {}) };
+export async function loadData(userId) {
+  const fallbackData = { ...starterData(), ...readJson(userDataKey(userId), {}) };
+  if (!firebaseReady()) return fallbackData;
+  const cloudData = await loadCloudData(userId, fallbackData);
+  writeJson(userDataKey(userId), cloudData);
+  return cloudData;
 }
 
-export function saveData(userId, data) {
+export async function saveData(userId, data) {
   writeJson(userDataKey(userId), data);
+  if (firebaseReady()) {
+    await saveCloudData(userId, data);
+  }
 }
 
 export function makeId() {
