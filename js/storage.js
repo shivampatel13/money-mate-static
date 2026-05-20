@@ -79,23 +79,11 @@ export async function login(email, password) {
   return session;
 }
 
-export async function resetPassword(email, newPassword) {
+export async function requestPasswordReset(email) {
   const id = normaliseEmail(email);
   if (!id || !id.includes("@")) throw new Error("Enter the email address for your account.");
-  if (newPassword.length < 4) throw new Error("Use at least 4 characters for the new password.");
-  const users = readJson(USERS_KEY, []);
-  const index = users.findIndex((user) => user.id === id);
-  if (index === -1) throw new Error("No account found for that email.");
-  const saltBytes = new Uint8Array(16);
-  crypto.getRandomValues(saltBytes);
-  const salt = bytesToHex(saltBytes);
-  users[index] = {
-    ...users[index],
-    salt,
-    passwordHash: await hashPassword(newPassword, salt),
-    passwordUpdatedAt: new Date().toISOString(),
-  };
-  writeJson(USERS_KEY, users);
+  // Static hosting cannot verify email ownership. A production app should send a
+  // verified reset link using Firebase, Supabase, Auth0, Clerk, or a backend API.
   return { email: id };
 }
 

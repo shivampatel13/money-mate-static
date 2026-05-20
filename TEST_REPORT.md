@@ -23,7 +23,7 @@ Used a separate local QA user: `qa-test`
 - Settings page: Passed
 - Help page: Passed
 - Updated email signup/login flow: Passed
-- Reset password flow: Passed
+- Secure reset-password placeholder: Passed
 
 ## Fixes Made During QA
 
@@ -35,8 +35,9 @@ Used a separate local QA user: `qa-test`
 - After signup, the user is sent back to login instead of being logged in automatically.
 - Login now uses email instead of user ID.
 - Forgot password opens a reset screen.
-- Reset password asks for email and new password, then returns user to login.
-- Login with the new password was verified.
+- Reset screen now asks for email only.
+- Direct local password reset was removed because it does not verify email ownership.
+- Production reset should be connected to Firebase, Supabase, Auth0, Clerk, or a backend email reset flow.
 
 ## Verified Scenario
 
