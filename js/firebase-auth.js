@@ -25,7 +25,7 @@ function friendlyFirebaseError(error) {
   const code = error?.code || "";
   if (code.includes("email-already-in-use")) return "That email already has an account. Please log in.";
   if (code.includes("invalid-email")) return "Enter a valid email address.";
-  if (code.includes("weak-password")) return "Use a stronger password with at least 6 characters.";
+  if (code.includes("weak-password")) return "Use a stronger password with at least 8 characters.";
   if (code.includes("user-not-found") || code.includes("invalid-credential") || code.includes("wrong-password")) {
     return "Email or password is incorrect.";
   }
@@ -65,6 +65,15 @@ export async function loginFirebaseUser(email, password) {
   }
 }
 
+export async function signOutFirebaseUser() {
+  try {
+    const { auth, authModule } = await getFirebaseAuth();
+    await authModule.signOut(auth);
+  } catch {
+    // Logging out should still clear the local app session even if Firebase is temporarily unavailable.
+  }
+}
+
 export async function sendVerifiedPasswordResetEmail(email) {
   if (!firebaseReady()) {
     throw new Error("Password reset emails are not switched on yet. Ask the app owner to connect secure email login before using this feature.");
@@ -74,6 +83,7 @@ export async function sendVerifiedPasswordResetEmail(email) {
     const { auth, authModule } = await getFirebaseAuth();
     await authModule.sendPasswordResetEmail(auth, email);
   } catch (error) {
+    if (error?.code?.includes("user-not-found")) return;
     throw new Error(friendlyFirebaseError(error));
   }
 }

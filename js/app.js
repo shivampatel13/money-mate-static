@@ -541,43 +541,43 @@ function action(route, title, text, icon, tone) {
 
 function input(id, label, value = "", type = "text", placeholder = "") {
   const displayValue = type === "number" && Number(value) === 0 ? "" : value;
-  return `<div class="field-group"><label for="${id}">${label}</label><input class="field" id="${id}" type="${type}" value="${escapeHtml(String(displayValue))}" placeholder="${placeholder}"></div>`;
+  return `<div class="field-group"><label for="${escapeHtml(id)}">${escapeHtml(label)}</label><input class="field" id="${escapeHtml(id)}" type="${escapeHtml(type)}" value="${escapeHtml(String(displayValue))}" placeholder="${escapeHtml(placeholder)}"></div>`;
 }
 
 function select(id, label, value, options) {
-  return `<div class="field-group"><label for="${id}">${label}</label><select class="field" id="${id}">${options.map(([key, text]) => `<option value="${key}" ${key === value ? "selected" : ""}>${text}</option>`).join("")}</select></div>`;
+  return `<div class="field-group"><label for="${escapeHtml(id)}">${escapeHtml(label)}</label><select class="field" id="${escapeHtml(id)}">${options.map(([key, text]) => `<option value="${escapeHtml(String(key))}" ${key === value ? "selected" : ""}>${escapeHtml(String(text))}</option>`).join("")}</select></div>`;
 }
 
 function expenseItem(item) {
-  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">${item.category} · ${item.date}</p></div><div><strong>${moneyExact(item.amount)}</strong><button class="btn btn-danger" data-delete="${item.id}" data-type="expense">Delete</button></div></div>`;
+  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">${escapeHtml(item.category)} · ${escapeHtml(item.date)}</p></div><div><strong>${moneyExact(item.amount)}</strong><button class="btn btn-danger" data-delete="${escapeHtml(item.id)}" data-type="expense">Delete</button></div></div>`;
 }
 
 function budgetItem(item) {
-  return `<div class="list-item"><div style="flex:1">${progressLine(item.category, item.spent, item.limit)}</div><button class="btn btn-danger" data-delete="${item.id}" data-type="budget">Delete</button></div>`;
+  return `<div class="list-item"><div style="flex:1">${progressLine(item.category, item.spent, item.limit)}</div><button class="btn btn-danger" data-delete="${escapeHtml(item.id)}" data-type="budget">Delete</button></div>`;
 }
 
 function accountItem(item) {
-  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">${item.type.replace("_", " ")}</p></div><div><strong>${moneyExact(item.balance)}</strong><button class="btn btn-danger" data-delete="${item.id}" data-type="account">Delete</button></div></div>`;
+  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">${escapeHtml(item.type.replace("_", " "))}</p></div><div><strong>${moneyExact(item.balance)}</strong><button class="btn btn-danger" data-delete="${escapeHtml(item.id)}" data-type="account">Delete</button></div></div>`;
 }
 
 function billItem(item) {
-  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">${item.frequency} · ${item.paymentDate}</p></div><div><strong>${moneyExact(item.amount)}</strong><button class="btn btn-danger" data-delete="${item.id}" data-type="bill">Delete</button></div></div>`;
+  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">${escapeHtml(item.frequency)} · ${escapeHtml(item.paymentDate)}</p></div><div><strong>${moneyExact(item.amount)}</strong><button class="btn btn-danger" data-delete="${escapeHtml(item.id)}" data-type="bill">Delete</button></div></div>`;
 }
 
 function debtItem(item) {
-  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">Due ${item.dueDate} · Min ${moneyExact(item.minimumPayment)}</p></div><div><strong>${moneyExact(item.amount)}</strong><button class="btn btn-danger" data-delete="${item.id}" data-type="debt">Delete</button></div></div>`;
+  return `<div class="list-item"><div><strong>${escapeHtml(item.name)}</strong><p class="muted small">Due ${escapeHtml(item.dueDate)} · Min ${moneyExact(item.minimumPayment)}</p></div><div><strong>${moneyExact(item.amount)}</strong><button class="btn btn-danger" data-delete="${escapeHtml(item.id)}" data-type="debt">Delete</button></div></div>`;
 }
 
 function bars(items, emptyTitle, emptyText) {
   if (!items.length) return empty(emptyTitle, emptyText);
   const max = Math.max(...items.map((item) => item.value), 1);
-  return `<div class="bars">${items.map((item) => `<div class="bar-row"><strong>${item.name}</strong><div class="bar-track"><span style="width:${Math.max(4, (item.value / max) * 100)}%"></span></div><span>${money(item.value)}</span></div>`).join("")}</div>`;
+  return `<div class="bars">${items.map((item) => `<div class="bar-row"><strong>${escapeHtml(item.name)}</strong><div class="bar-track"><span style="width:${Math.max(4, (item.value / max) * 100)}%"></span></div><span>${money(item.value)}</span></div>`).join("")}</div>`;
 }
 
 function progressLine(label, spent, limit) {
   const percent = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
   const left = limit - spent;
-  return `<div><div style="display:flex;justify-content:space-between;gap:12px"><strong>${label}</strong><span class="small ${left < 0 ? "danger-text" : ""}">${left < 0 ? "Over budget" : `${money(left)} left`}</span></div><div class="progress"><span style="width:${percent}%;background:${left < 0 ? "var(--danger)" : percent > 80 ? "var(--warning)" : "var(--primary)"}"></span></div><p class="small muted">Spent ${moneyExact(spent)} of ${moneyExact(limit)}</p></div>`;
+  return `<div><div style="display:flex;justify-content:space-between;gap:12px"><strong>${escapeHtml(label)}</strong><span class="small ${left < 0 ? "danger-text" : ""}">${left < 0 ? "Over budget" : `${money(left)} left`}</span></div><div class="progress"><span style="width:${percent}%;background:${left < 0 ? "var(--danger)" : percent > 80 ? "var(--warning)" : "var(--primary)"}"></span></div><p class="small muted">Spent ${moneyExact(spent)} of ${moneyExact(limit)}</p></div>`;
 }
 
 function helpCard(title, text) {

@@ -1,5 +1,5 @@
 import { categories, defaultPayroll, taxSettings } from "./defaults.js";
-import { createFirebaseUser, firebaseReady, loginFirebaseUser, sendVerifiedPasswordResetEmail } from "./firebase-auth.js";
+import { createFirebaseUser, firebaseReady, loginFirebaseUser, sendVerifiedPasswordResetEmail, signOutFirebaseUser } from "./firebase-auth.js";
 
 const USERS_KEY = "mm_users";
 const SESSION_KEY = "mm_session";
@@ -29,6 +29,11 @@ const readJson = (key, fallback) => {
 };
 
 const writeJson = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+const clearLegacyAuthIfNeeded = () => {
+  if (firebaseReady()) {
+    localStorage.removeItem(USERS_KEY);
+  }
+};
 
 const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 
@@ -39,18 +44,28 @@ async function hashPassword(password, salt) {
 }
 
 export function getSession() {
-  return readJson(SESSION_KEY, null);
+  clearLegacyAuthIfNeeded();
+  const session = readJson(SESSION_KEY, null);
+  if (firebaseReady() && session?.authProvider !== "firebase") {
+    localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+  return session;
 }
 
 export function logout() {
+  if (firebaseReady()) {
+    signOutFirebaseUser();
+  }
   localStorage.removeItem(SESSION_KEY);
 }
 
 export async function register(name, email, password) {
+  clearLegacyAuthIfNeeded();
   const id = normaliseEmail(email);
   if (!name.trim()) throw new Error("Enter your name.");
   if (!id || !id.includes("@")) throw new Error("Enter a valid email address.");
-  if (password.length < 6) throw new Error("Use at least 6 characters for the password.");
+  if (password.length < 8) throw new Error("Use at least 8 characters for the password.");
 
   if (firebaseReady()) {
     const user = await createFirebaseUser(name, id, password);
@@ -79,10 +94,11 @@ export async function register(name, email, password) {
 }
 
 export async function login(email, password) {
+  clearLegacyAuthIfNeeded();
   const id = normaliseEmail(email);
 
   if (firebaseReady()) {
-    const session = await loginFirebaseUser(id, password);
+    const session = { ...(await loginFirebaseUser(id, password)), authProvider: "firebase", signedInAt: new Date().toISOString() };
     if (!localStorage.getItem(userDataKey(session.id))) {
       writeJson(userDataKey(session.id), starterData());
     }
@@ -100,6 +116,7 @@ export async function login(email, password) {
 }
 
 export async function requestPasswordReset(email) {
+  clearLegacyAuthIfNeeded();
   const id = normaliseEmail(email);
   if (!id || !id.includes("@")) throw new Error("Enter the email address for your account.");
   await sendVerifiedPasswordResetEmail(id);

@@ -24,6 +24,7 @@ Used a separate local QA user: `qa-test`
 - Help page: Passed
 - Updated email signup/login flow: Passed
 - Secure reset-password link flow: Passed
+- Security hardening pass: Passed with remaining production notes below
 
 ## Fixes Made During QA
 
@@ -38,6 +39,18 @@ Used a separate local QA user: `qa-test`
 - Reset screen now asks for email only.
 - Direct local password reset was removed because it does not verify email ownership.
 - Firebase Authentication support was added for secure hosted login, account creation and verified email reset links.
+- Login now removes old local password records when Firebase is enabled.
+- Logout now also signs out from Firebase.
+- Password reset avoids revealing whether an email address exists.
+- User-entered and imported text is escaped before display.
+- Local server and Netlify config now include basic security headers.
+
+## Remaining Production Security Notes
+
+- Finance data is still stored in browser localStorage. For real multi-user hosting, move accounts, expenses, bills, debts and payroll data to Firestore or another backend.
+- Add Firestore security rules so each logged-in user can only read and write their own records.
+- Firebase web config is safe to be public, but Firestore rules and authorized domains must be configured before launch.
+- Use HTTPS on the hosted domain.
 
 ## Verified Scenario
 
