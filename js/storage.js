@@ -1,4 +1,5 @@
 import { categories, defaultPayroll, taxSettings } from "./defaults.js";
+import { createFirebaseUser, firebaseReady, loginFirebaseUser, sendVerifiedPasswordResetEmail } from "./firebase-auth.js";
 
 const USERS_KEY = "mm_users";
 const SESSION_KEY = "mm_session";
@@ -49,7 +50,16 @@ export async function register(name, email, password) {
   const id = normaliseEmail(email);
   if (!name.trim()) throw new Error("Enter your name.");
   if (!id || !id.includes("@")) throw new Error("Enter a valid email address.");
-  if (password.length < 4) throw new Error("Use at least 4 characters for the password.");
+  if (password.length < 6) throw new Error("Use at least 6 characters for the password.");
+
+  if (firebaseReady()) {
+    const user = await createFirebaseUser(name, id, password);
+    if (!localStorage.getItem(userDataKey(user.id))) {
+      writeJson(userDataKey(user.id), starterData());
+    }
+    return user;
+  }
+
   const users = readJson(USERS_KEY, []);
   if (users.some((user) => user.id === id)) throw new Error("That email already has an account. Please log in.");
   const saltBytes = new Uint8Array(16);
@@ -70,6 +80,16 @@ export async function register(name, email, password) {
 
 export async function login(email, password) {
   const id = normaliseEmail(email);
+
+  if (firebaseReady()) {
+    const session = await loginFirebaseUser(id, password);
+    if (!localStorage.getItem(userDataKey(session.id))) {
+      writeJson(userDataKey(session.id), starterData());
+    }
+    writeJson(SESSION_KEY, session);
+    return session;
+  }
+
   const user = readJson(USERS_KEY, []).find((item) => item.id === id);
   if (!user) throw new Error("No account found for that email.");
   const passwordHash = await hashPassword(password, user.salt);
@@ -82,8 +102,7 @@ export async function login(email, password) {
 export async function requestPasswordReset(email) {
   const id = normaliseEmail(email);
   if (!id || !id.includes("@")) throw new Error("Enter the email address for your account.");
-  // Static hosting cannot verify email ownership. A production app should send a
-  // verified reset link using Firebase, Supabase, Auth0, Clerk, or a backend API.
+  await sendVerifiedPasswordResetEmail(id);
   return { email: id };
 }
 

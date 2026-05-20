@@ -340,22 +340,24 @@ function render() {
 function bindAuth() {
   document.querySelector("[data-auth-form]").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const mode = event.submitter.dataset.mode || authMode;
-    const password = document.querySelector("#auth-password").value;
+    const mode = event.submitter?.dataset.mode || authMode;
     const email = document.querySelector("#auth-email").value;
     const name = document.querySelector("#auth-name")?.value || "";
+    document.querySelector("#auth-error").textContent = "";
     try {
       if (mode === "reset") {
         await requestPasswordReset(email);
         authMode = "login";
-        authMessage = "If this email has an account, a reset link should be sent. Connect Firebase or Supabase to enable verified email reset.";
+        authMessage = "If this email has an account, a secure reset link has been sent.";
         render();
       } else if (mode === "register") {
+        const password = document.querySelector("#auth-password").value;
         await register(name, email, password);
         authMode = "login";
         authMessage = "Account created. Please log in with your email and password.";
         render();
       } else {
+        const password = document.querySelector("#auth-password").value;
         session = await login(email, password);
         state = loadData(session.id);
         authMessage = "";
@@ -501,7 +503,7 @@ function authPage() {
   const intro = isRegister
     ? "Add your name, email and password. After creating the account, log in again."
     : isReset
-      ? "Enter your email. A secure production app should send a verified reset link."
+      ? "Enter your email. Your password will only change through a verified reset link."
       : "Log in with your email and password to see your saved money data.";
   return `
     <main class="auth-page">
@@ -518,7 +520,7 @@ function authPage() {
           ${isRegister ? input("auth-name", "Your name", "", "text", "for example: Amit Patel") : ""}
           ${input("auth-email", "Email address", "", "email", "you@example.com")}
           ${isReset ? "" : input("auth-password", "Password", "", "password", "Your password")}
-          <button class="btn btn-primary full" data-mode="${isRegister ? "register" : isReset ? "reset" : "login"}">${isRegister ? "Create account" : isReset ? "Send reset link" : "Log in"}</button>
+          <button class="btn btn-primary full" type="submit" data-mode="${isRegister ? "register" : isReset ? "reset" : "login"}">${isRegister ? "Create account" : isReset ? "Send reset link" : "Log in"}</button>
           ${!isRegister && !isReset ? `<button class="btn btn-ghost full" type="button" data-auth-switch="reset">Forgot password?</button>` : ""}
           <div class="divider">or</div>
           <button class="btn btn-secondary full" type="button" data-auth-switch="${isRegister || isReset ? "login" : "register"}">${isRegister || isReset ? "Back to login" : "Create new account"}</button>
